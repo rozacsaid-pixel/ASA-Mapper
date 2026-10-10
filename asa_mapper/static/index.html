@@ -1,3 +1,75 @@
 <!doctype html>
-<title>ASA Mapper</title>
-<p>ASA Mapper</p>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASA Mapper</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <h1><a href="#/">ASA Mapper</a></h1>
+  <div id="library-status" class="library">Loading library…</div>
+  <nav class="library-actions">
+    <button id="refresh-library" type="button" hidden>Refresh from Google</button>
+    <label class="button">Upload library .xlsx<input id="library-file" type="file" accept=".xlsx" hidden></label>
+    <a href="#/accuracy">Accuracy</a>
+    <span id="user" class="muted"></span>
+  </nav>
+</header>
+<main>
+  <section id="view-home" hidden>
+    <h2>Start a review</h2>
+    <label class="drop" id="drop">Drop a form export .zip here, or click to choose
+      <input id="export-file" type="file" accept=".zip" hidden></label>
+    <p id="upload-msg" class="msg"></p>
+    <h2>Reviews</h2>
+    <table class="list">
+      <thead><tr><th>Form</th><th>Started</th><th>Finished</th></tr></thead>
+      <tbody id="sessions"></tbody>
+    </table>
+  </section>
+
+  <section id="view-review" hidden>
+    <div class="review-head">
+      <h2 id="form-name"></h2>
+      <div class="progress"><div id="progress-bar"></div></div>
+      <span id="progress-text" class="muted"></span>
+    </div>
+    <div class="toolbar">
+      <select id="filter-status" aria-label="Status filter">
+        <option value="all">All fields</option>
+        <option value="needs">Needs review</option>
+        <option value="pending">Not reviewed</option>
+        <option value="done">Reviewed</option>
+        <option value="skipped">Skipped</option>
+      </select>
+      <select id="filter-section" aria-label="Section filter"></select>
+      <input id="filter-text" type="search" placeholder="Search label or key">
+      <span class="spacer"></span>
+      <a id="download" class="button" href="#">Download review sheet</a>
+      <button id="finish" type="button" class="primary">Finish review</button>
+    </div>
+    <p id="review-msg" class="msg"></p>
+    <div id="review-body"></div>
+  </section>
+
+  <section id="view-accuracy" hidden>
+    <h2>Accuracy on known mappings</h2>
+    <p class="muted">Runs the matcher on stored mappings (seeded forms and finished reviews). Each form is scored without its own mappings.</p>
+    <button id="run-accuracy" type="button" class="primary">Run</button>
+    <div id="accuracy-body"></div>
+  </section>
+</main>
+
+<dialog id="search-dialog">
+  <form method="dialog">
+    <h3>Choose an ASA</h3>
+    <input id="search-input" type="search" placeholder="Search alias, meaning or section">
+    <ul id="search-results"></ul>
+    <menu><button value="cancel">Cancel</button></menu>
+  </form>
+</dialog>
+<script src="/static/app.js"></script>
+</body>
+</html>

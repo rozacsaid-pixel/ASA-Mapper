@@ -1,0 +1,66 @@
+:root {
+  --bg: #f7f8fa; --panel: #ffffff; --text: #1d2330; --muted: #667085; --border: #dde1e7;
+  --accent: #2f6fde; --accent-text: #ffffff; --warn: #b42318; --warn-bg: #fef3f2;
+  --high: #067647; --high-bg: #ecfdf3; --medium: #b54708; --medium-bg: #fffaeb; --low: #b42318; --low-bg: #fef3f2;
+  --row-done: #f6fef9;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151b; --panel: #1b2029; --text: #e6e9ef; --muted: #98a2b3; --border: #2e3542;
+    --accent: #5b8def; --warn: #f97066; --warn-bg: #3a1d1b;
+    --high: #47cd89; --high-bg: #133024; --medium: #fdb022; --medium-bg: #3a2a10; --low: #f97066; --low-bg: #3a1d1b;
+    --row-done: #15241c;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+a { color: var(--accent); }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 12px 24px; background: var(--panel); border-bottom: 1px solid var(--border); }
+.top h1 { font-size: 18px; margin: 0; }
+.top h1 a { color: var(--text); text-decoration: none; }
+.library { flex: 1; color: var(--muted); }
+.library-actions { display: flex; gap: 12px; align-items: center; }
+main { padding: 16px 24px 48px; max-width: 1500px; margin: 0 auto; }
+button, .button, select, input[type=search] { font: inherit; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); color: var(--text); cursor: pointer; text-decoration: none; display: inline-block; }
+input[type=search] { cursor: text; min-width: 220px; }
+.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.drop { display: block; padding: 40px; text-align: center; border: 2px dashed var(--border); border-radius: 10px; background: var(--panel); cursor: pointer; color: var(--muted); }
+.drop.over { border-color: var(--accent); color: var(--accent); }
+.msg { min-height: 1.4em; color: var(--muted); }
+.muted { color: var(--muted); }
+.warn, .flag { color: var(--warn); }
+.flag { font-size: 12px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; word-break: break-all; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+.review-head { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.review-head h2 { margin: 8px 0; flex: 1; }
+.progress { width: 220px; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+#progress-bar { height: 100%; width: 0; background: var(--accent); }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; position: sticky; top: 0; background: var(--bg); padding: 8px 0; z-index: 1; }
+.spacer { flex: 1; }
+.section { margin: 20px 0; }
+.section-head { display: flex; align-items: center; gap: 12px; }
+.section-head h3 { margin: 8px 0; font-size: 15px; flex: 1; }
+.fields td:nth-child(1) { width: 34%; }
+.fields td:nth-child(2) { width: 20%; }
+.fields td:nth-child(3) select { width: 100%; max-width: 420px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.label { font-weight: 500; }
+.meta { color: var(--muted); font-size: 12px; }
+tr.option td { background: var(--bg); }
+.opt-label { padding-left: 24px; }
+tr.skipped td { color: var(--muted); }
+.conf, .status { font-size: 12px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+.conf-high { color: var(--high); background: var(--high-bg); }
+.conf-medium { color: var(--medium); background: var(--medium-bg); }
+.conf-low { color: var(--low); background: var(--low-bg); }
+.status-accepted, .status-changed { color: var(--high); background: var(--high-bg); }
+.status-none { color: var(--muted); background: var(--bg); }
+.status-pending { color: var(--muted); }
+dialog { width: min(720px, 92vw); border: 1px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); }
+dialog input { width: 100%; }
+#search-results { list-style: none; padding: 0; max-height: 50vh; overflow: auto; }
+#search-results button { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px; margin: 4px 0; }
+#search-results span { color: var(--muted); font-size: 12px; }
+menu { display: flex; justify-content: flex-end; padding: 0; }
