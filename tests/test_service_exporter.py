@@ -42,3 +42,13 @@ def test_review_sheet_rows(export_dir, library):
     assert sig["Status"] == "skipped" and "Signature" in sig["Flags"]
     assert any(r["Field key"] == "commitment" and "not in library" in r["Flags"] for r in rows)
     assert next(r for r in rows if r["Field key"] == "phone1")["Status"] == "pending"
+
+
+def test_review_sheet_keeps_decision_on_skipped_field(export_dir, library):
+    form, review = make_review(export_dir, library)
+    decisions = {"sig": {"status": "changed", "asa": "asa_fullname_investorname_generalinfo"}}
+    ws = openpyxl.load_workbook(io.BytesIO(review_sheet(form.name, review, decisions))).active
+    rows = [dict(zip(SHEET_HEADERS, [c.value or "" for c in r])) for r in ws.iter_rows(min_row=2)]
+    sig = next(r for r in rows if r["Field key"] == "sig")
+    assert (sig["Accepted ASA"], sig["Status"]) == ("asa_fullname_investorname_generalinfo", "changed")
+    assert "Signature" in sig["Flags"]

@@ -70,3 +70,12 @@ def test_sign_in_required_when_configured(tmp_path):
     response = client.get("/", follow_redirects=False)
     assert response.status_code in (302, 307) and response.headers["location"].endswith("/login")
     assert client.get("/healthz").status_code == 200
+
+
+def test_search_matches_all_words_and_prefers_parent(client, library_xlsx):
+    upload(client, "/api/library/upload", "lib.xlsx", library_xlsx)
+    assert [r["asa"] for r in client.get("/api/search", params={"q": "primary phone"}).json()] == [
+        "asa_phone_primarycontact_contactinfo"]
+    rows = client.get("/api/search", params={"kind": "option", "parent": "asa_bhc_specialentities"}).json()
+    assert [r["asa"] for r in rows[:2]] == ["asa_yes_bhc_specialentities", "asa_no_bhc_specialentities"]
+    assert "asa_individual_investortype" in [r["asa"] for r in rows]

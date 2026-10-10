@@ -77,7 +77,9 @@ drop.ondrop = (e) => {
 /* ---------- review: helpers ---------- */
 const sectionOf = (f) => f.path.slice(1).join(" › ") || f.path[0] || "(no section)";
 const fieldByKey = (key) => state.session.review.fields.find((f) => f.key === key);
-const suggOf = (key) => state.session.review.suggestions[key];
+// Skipped fields have no stored suggestions; give them an empty entry so they can still be mapped by hand.
+const suggOf = (key) => state.session.review.suggestions[key] ||
+  (state.session.review.suggestions[key] = { field: [], options: {}, parent: "", flags: [] });
 const decided = (d) => !!d && !!d.status && d.status !== "pending";
 const hasOptions = (f) => OPTION_WIDGETS.has(f.widget) && f.options.length > 0;
 
@@ -126,9 +128,29 @@ function existingCell(asas, flags) {
   return list + flags.map((f) => `<div class="flag">⚠ ${esc(f)}</div>`).join("");
 }
 
+const copyButton = (text) =>
+  `<button type="button" class="copy mono" data-copy="${esc(text)}" title="Copy to search in the form builder">${esc(text)} ⧉</button>`;
+const copyAsaButton = `<button type="button" class="copy" data-copy-select title="Copy the selected ASA">⧉</button>`;
+
 function labelCell(f) {
-  const meta = [f.key, f.widget, f.hidden ? "hidden" : "", f.headings.join(" › ")].filter(Boolean).join(" · ");
-  return `<div class="label">${esc(f.label)}</div><div class="meta">${esc(meta)}</div>`;
+  const meta = [f.widget, f.hidden ? "hidden" : "", f.headings.join(" › ")].filter(Boolean).join(" · ");
+  return `<div class="label">${esc(f.label)}</div><div class="meta">${copyButton(f.key)} ${esc(meta)}</div>`;
+}
+
+async function copyText(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const area = document.createElement("textarea");
+    area.value = text;
+    document.body.appendChild(area);
+    area.select();
+    document.execCommand("copy");
+    area.remove();
+  }
+  const before = button.innerHTML;
+  button.textContent = "Copied";
+  setTimeout(() => { button.innerHTML = before; }, 900);
 }
 
 function currentAsa(d, ranked) {
@@ -137,8 +159,14 @@ function currentAsa(d, ranked) {
 
 function fieldRows(f) {
   if (f.skip_reason) {
-    return `<tr class="skipped"><td>${labelCell(f)}</td><td>${existingCell(f.existing_asa, [])}</td>` +
-      `<td colspan="4" class="muted">Skipped: ${esc(f.skip_reason)}</td></tr>`;
+    const d = state.decisions[f.key];
+    return `<tr class="skipped" data-key="${esc(f.key)}">
+      <td>${labelCell(f)}<div class="meta">Skipped: ${esc(f.skip_reason)}</div></td>
+      <td>${existingCell(f.existing_asa, [])}</td>
+      <td>${asaSelect([], f.existing_asa, decided(d) ? d.asa : "")} ${copyAsaButton}</td>
+      <td></td>
+      <td>${statusBadge(d && d.status)}</td>
+      <td><button type="button" data-accept>Accept</button></td></tr>`;
   }
   const sug = suggOf(f.key);
   const d = state.decisions[f.key];
@@ -146,7 +174,7 @@ function fieldRows(f) {
   let html = `<tr class="field" data-key="${esc(f.key)}">
     <td>${labelCell(f)}</td>
     <td>${existingCell(f.existing_asa, sug.flags)}</td>
-    <td>${asaSelect(sug.field, f.existing_asa, current)}</td>
+    <td>${asaSelect(sug.field, f.existing_asa, current)} ${copyAsaButton}</td>
     <td>${confBadge(sug.field.find((r) => r.asa === current))}</td>
     <td>${statusBadge(d && d.status)}</td>
     <td><button type="button" data-accept>Accept</button></td></tr>`;
@@ -156,9 +184,9 @@ function fieldRows(f) {
     const ranked = sug.options[o.key] || [];
     const cur = currentAsa(od, ranked);
     html += `<tr class="option" data-key="${esc(f.key)}" data-opt="${esc(o.key)}">
-      <td class="opt-label">↳ ${esc(o.label)}</td>
+      <td class="opt-label">↳ ${esc(o.label)}<div class="meta">${copyButton(`${f.key}#${o.key}`)}</div></td>
       <td>${existingCell(o.existing_asa, [])}</td>
-      <td>${asaSelect(ranked, o.existing_asa, cur)}</td>
+      <td>${asaSelect(ranked, o.existing_asa, cur)} ${copyAsaButton}</td>
       <td>${confBadge(ranked.find((r) => r.asa === cur))}</td>
       <td>${statusBadge(od && od.status)}</td>
       <td><button type="button" data-accept>Accept</button></td></tr>`;
@@ -221,7 +249,8 @@ async function setDecision(key, opt, asa, forcedStatus) {
     const top = (sug.field[0] || {}).asa || "";
     d.asa = asa;
     d.status = forcedStatus || (asa === top ? "accepted" : "changed");
-    if (hasOptions(fieldByKey(key)) && asa && asa !== sug.parent) {
+    const f = fieldByKey(key);
+    if (!f.skip_reason && hasOptions(f) && asa && asa !== sug.parent) {
       sug.options = await api(`/api/sessions/${state.session.id}/options`, jsonOpts("POST", { field_key: key, parent_asa: asa }));
       sug.parent = asa;
       d.options = {};
@@ -275,10 +304,17 @@ function openSearch(kind, parent) {
       const rows = await api(`/api/search?${new URLSearchParams({ q: input.value, kind, parent })}`);
       results.innerHTML = rows.map((r) =>
         `<li><button type="button" data-pick="${esc(r.asa)}"><strong class="mono">${esc(r.asa)}</strong>` +
-        `<span>${esc(r.summary)} · ${esc(r.section)}${r.group ? ` · ${esc(r.group)}` : ""}</span></button></li>`
+        `<span>${parent && r.parent === parent ? "Under this field · " : ""}${esc(r.summary)} · ${esc(r.section)}${r.group ? ` · ${esc(r.group)}` : ""}</span></button></li>`
       ).join("") || `<li class="muted">No matches</li>`;
     };
     input.oninput = run;
+    // Enter would submit the dialog form and close it with nothing chosen; pick the first result instead.
+    input.onkeydown = (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      const first = results.querySelector("[data-pick]");
+      if (first) { chosen = first.dataset.pick; dlg.close(); }
+    };
     results.onclick = (e) => {
       const b = e.target.closest("[data-pick]");
       if (b) { chosen = b.dataset.pick; dlg.close(); }
@@ -305,6 +341,14 @@ $("#review-body").addEventListener("change", async (ev) => {
 });
 
 $("#review-body").addEventListener("click", async (ev) => {
+  const copy = ev.target.closest("[data-copy]");
+  if (copy) { copyText(copy.dataset.copy, copy); return; }
+  const copySelected = ev.target.closest("[data-copy-select]");
+  if (copySelected) {
+    const value = copySelected.closest("td").querySelector("select[data-asa]").value;
+    if (!value.startsWith("__")) copyText(value, copySelected);
+    return;
+  }
   const high = ev.target.closest("[data-accept-high]");
   if (high) { acceptHigh(high.dataset.acceptHigh); return; }
   const btn = ev.target.closest("[data-accept]");

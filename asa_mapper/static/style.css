@@ -64,3 +64,6 @@ dialog input { width: 100%; }
 #search-results button { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px; margin: 4px 0; }
 #search-results span { color: var(--muted); font-size: 12px; }
 menu { display: flex; justify-content: flex-end; padding: 0; }
+.copy { padding: 0 6px; font-size: 12px; border-radius: 4px; background: transparent; color: var(--accent); border-color: transparent; }
+.copy:hover { border-color: var(--border); background: var(--panel); }
+.meta .copy { margin-left: -6px; }

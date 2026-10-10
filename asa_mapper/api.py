@@ -142,19 +142,15 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/api/search")
     def search(q: str = "", kind: str = "any", parent: str = ""):
+        """Entries containing every word of q; options under `parent` are listed first, never exclusively."""
         require_library()
-        needle = q.lower().strip()
-        out = []
-        for e in state.library.entries:
-            if (kind != "any" and e.kind != kind) or (parent and e.parent != parent):
-                continue
-            if needle and needle not in f"{e.asa} {e.summary} {e.section} {e.group}".lower():
-                continue
-            out.append({"asa": e.asa, "kind": e.kind, "summary": e.summary, "section": e.section,
-                        "group": e.group, "parent": e.parent})
-            if len(out) >= SEARCH_LIMIT:
-                break
-        return out
+        words = q.lower().split()
+        hits = [e for e in state.library.entries
+                if (kind == "any" or e.kind == kind)
+                and all(w in f"{e.asa} {e.summary} {e.section} {e.group}".lower() for w in words)]
+        hits.sort(key=lambda e: not (parent and e.parent == parent))  # stable: keeps library order otherwise
+        return [{"asa": e.asa, "kind": e.kind, "summary": e.summary, "section": e.section,
+                 "group": e.group, "parent": e.parent} for e in hits[:SEARCH_LIMIT]]
 
     @app.get("/api/sessions")
     def list_sessions():

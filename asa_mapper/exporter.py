@@ -31,12 +31,15 @@ def review_sheet(form_name: str, review: dict, decisions: dict) -> bytes:
         page, section = (path[0] if path else ""), " > ".join(path[1:])
         base = [page, section, field["label"], field["key"]]
         existing = ", ".join(field["existing_asa"])
+        d = decisions.get(field["key"]) or {}
         if field["skip_reason"]:
-            ws.append(base + ["", field["widget"], existing, "", "", "", "", "", "skipped",
-                              field["skip_reason"], "", ""])
+            # A DS can still map a skipped field by hand; keep that decision.
+            status = d.get("status", "pending")
+            ws.append(base + ["", field["widget"], existing, "", "", "", "", d.get("asa", ""),
+                              "skipped" if status == "pending" else status, field["skip_reason"],
+                              d.get("reviewer", ""), d.get("at", "")])
             continue
         sug = review["suggestions"].get(field["key"], {})
-        d = decisions.get(field["key"]) or {}
         ws.append(base + ["", field["widget"], existing] + _top3(sug.get("field", [])) +
                   [d.get("asa", ""), d.get("status", "pending"), "; ".join(sug.get("flags", [])),
                    d.get("reviewer", ""), d.get("at", "")])
