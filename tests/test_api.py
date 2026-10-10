@@ -14,14 +14,22 @@ def upload(client, path, name, data):
     return client.post(path, files={"file": (name, data)})
 
 
+def start(client, name, export_zip, template=None, asa=None):
+    from tests.helpers import make_template_xlsx
+    files = {"file": (name, export_zip), "template": ("template.xlsx", template or make_template_xlsx())}
+    if asa is not None:
+        files["asa_file"] = ("asa.txt", asa)
+    return client.post("/api/sessions", files=files)
+
+
 def test_full_review_flow(client, library_xlsx, export_zip):
     assert client.get("/api/library").json()["loaded"] is False
-    assert upload(client, "/api/sessions", "e.zip", export_zip).status_code == 409
+    assert start(client, "e.zip", export_zip).status_code == 409
 
     lib = upload(client, "/api/library/upload", "lib.xlsx", library_xlsx).json()
     assert (lib["loaded"], lib["names"], lib["options"]) == (True, 5, 5)
 
-    created = upload(client, "/api/sessions", "Sample - Version 3.zip", export_zip).json()
+    created = start(client, "Sample - Version 3.zip", export_zip).json()
     assert created["form_name"] == "Sample Fund - Subscription Booklet (Version 3)"
     sid = created["id"]
     session = client.get(f"/api/sessions/{sid}").json()
@@ -50,7 +58,7 @@ def test_full_review_flow(client, library_xlsx, export_zip):
 def test_bad_uploads(client, library_xlsx):
     assert upload(client, "/api/library/upload", "x.xlsx", b"nope").status_code == 400
     upload(client, "/api/library/upload", "lib.xlsx", library_xlsx)
-    assert upload(client, "/api/sessions", "x.zip", b"nope").status_code == 400
+    assert start(client, "x.zip", b"nope").status_code == 400
     assert client.get("/api/sessions/missing").status_code == 404
 
 
@@ -84,14 +92,35 @@ def test_search_matches_all_words_and_prefers_parent(client, library_xlsx):
 def test_session_with_system_asa_export_and_txt_download(client, library_xlsx, export_zip):
     upload(client, "/api/library/upload", "lib.xlsx", library_xlsx)
     asa_text = b"email1-->asa_email_primarycontact_contactinfo\nbank#No-->asa_no_bhc_specialentities\nghost-->asa_x\n"
-    created = client.post("/api/sessions", files={"file": ("e.zip", export_zip), "asa_file": ("asa.txt", asa_text)}).json()
+    created = start(client, "e.zip", export_zip, asa=asa_text).json()
     assert created["existing_asa"] == 2 and created["asa_unmatched"] == ["ghost"]
     fields = {f["key"]: f for f in client.get(f"/api/sessions/{created['id']}").json()["review"]["fields"]}
     assert fields["email1"]["existing_asa"] == ["asa_email_primarycontact_contactinfo"]
     assert fields["fullname"]["existing_asa"] == []
-    bad = client.post("/api/sessions", files={"file": ("e.zip", export_zip), "asa_file": ("asa.txt", b"oops")})
+    bad = start(client, "e.zip", export_zip, asa=b"oops")
     assert bad.status_code == 400
     client.put(f"/api/sessions/{created['id']}/decisions",
                json={"phone1": {"status": "changed", "asa": "asa_phone_primarycontact_contactinfo"}})
     txt = client.get(f"/api/sessions/{created['id']}/asa.txt")
     assert txt.status_code == 200 and txt.text == "phone1-->asa_phone_primarycontact_contactinfo\n"
+
+
+def test_template_required_checked_and_filled(client, library_xlsx, export_zip):
+    from tests.helpers import make_template_xlsx
+    import io, openpyxl
+    upload(client, "/api/library/upload", "lib.xlsx", library_xlsx)
+    assert client.post("/api/sessions", files={"file": ("e.zip", export_zip)}).status_code == 422
+    assert start(client, "e.zip", export_zip, template=library_xlsx).status_code == 400
+    created = start(client, "e.zip", export_zip, template=make_template_xlsx(drop={"email1"}),
+                    asa=b"phone1-->asa_phone_primarycontact_contactinfo\n").json()
+    assert created["template"]["missing_in_template"] == ["email1"]
+    sid = created["id"]
+    client.put(f"/api/sessions/{sid}/decisions",
+               json={"bank": {"status": "accepted", "asa": "asa_bhc_specialentities", "options": {}}})
+    filled = client.get(f"/api/sessions/{sid}/template.xlsx")
+    assert filled.status_code == 200 and filled.headers["x-asa-rows-filled"] == "2"
+    ws = openpyxl.load_workbook(io.BytesIO(filled.content)).active
+    asas = {r[1]: r[9] for r in ws.iter_rows(min_row=2, values_only=True) if r[1]}
+    assert asas["bank"] == "asa_bhc_specialentities"
+    assert asas["phone1"] == "asa_phone_primarycontact_contactinfo"   # unreviewed: kept from system export
+    assert not asas["fullname"]

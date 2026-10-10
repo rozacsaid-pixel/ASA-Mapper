@@ -10,7 +10,13 @@ Design: `docs/superpowers/specs/2026-10-10-asa-mapper-design.md`
     .venv/bin/pip install -r requirements.txt
     .venv/bin/uvicorn asa_mapper.api:create_app --factory --port 8000
 
-Open http://localhost:8000. Load the ASA Library with **Upload library .xlsx** (in Google Sheets: File → Download → Microsoft Excel), then drop a form export `.zip`.
+Open http://localhost:8000. Load the ASA Library with **Upload library .xlsx** (in Google Sheets: File → Download → Microsoft Excel). Then start a review with:
+
+1. the form export `.zip` (required),
+2. the form's ASA mapping template `.xlsx` from the form builder (required; it must be for the same form version),
+3. the system ASA export `.txt` (optional; existing ASAs then come from the system).
+
+When done, **Download ASA template (.xlsx)** gives the builder's template with only the *Mapped Asa* column filled: your accepted ASAs, and for rows you didn't review, the ASA from the system export (if uploaded). Import it in the form builder (Map ASA/CSA mode). Every other cell of the template is left byte-for-byte unchanged.
 
 ## Command line
 

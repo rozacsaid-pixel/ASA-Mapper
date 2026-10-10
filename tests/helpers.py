@@ -124,3 +124,41 @@ def zip_export(folder: Path) -> bytes:
         for f in sorted(folder.iterdir()):
             zf.write(f, f"{folder.name}/{f.name}")
     return buf.getvalue()
+
+
+TEMPLATE_HEADER = ["No", "Form alias", "Field options", "Field label", "Alias path", "Label path", "Title path",
+                   "Field type", "Mapped pdf field", "Mapped Asa"]
+
+
+def make_template_xlsx(drop=(), extra=()) -> bytes:
+    """ASA mapping template like the form builder's: one row per node, then one per option.
+    `drop` removes rows by key ("field" or "field#option"); `extra` adds rows for unknown keys."""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Form Asa Mapping Template"
+    ws.append(TEMPLATE_HEADER)
+    rows = []
+
+    def walk(node, path):
+        key = node["name"]
+        alias_path = path + [key]
+        widget = UI.get(key, {}).get("ui:widget", "")
+        rows.append((key, ["", key, "", "label", "<".join(alias_path), "", "", widget.lower(), "", ""]))
+        for opt_key, _ in UI.get(key, {}).get("ui:multipleOption", {}).get("options", []):
+            rows.append((f"{key}#{opt_key}", ["", "", opt_key, opt_key, "<".join(alias_path + [opt_key]),
+                                              "", "", "", "", ""]))
+        for child in node.get("properties", []):
+            walk(child, alias_path)
+
+    for top in SCHEMA["properties"]:
+        walk(top, [])
+    for key in extra:
+        field, _, opt = key.partition("#")
+        rows.append((key, ["", "" if opt else field, opt, "x", f"x<{field}" + (f"<{opt}" if opt else ""),
+                           "", "", "", "", ""]))
+    for i, (key, row) in enumerate(r for r in rows if r[0] not in drop):
+        row[0] = str(i)
+        ws.append(row)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()

@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .asa_export import AsaExportError, apply_asa_export, format_asa_export, parse_asa_export
+from .asa_template import TemplateError, check_template, fill_template, final_asas
 from .asa_library import XLSX_MIME, LibraryError, fetch_google_sheet_xlsx, load_library_xlsx
 from .auth import current_user, install_auth
 from .evaluate import evaluate
@@ -158,7 +159,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return state.store.list_sessions()
 
     @app.post("/api/sessions")
-    async def create_session(file: UploadFile = File(...), asa_file: Optional[UploadFile] = File(None)):
+    async def create_session(file: UploadFile = File(...), template: UploadFile = File(...),
+                             asa_file: Optional[UploadFile] = File(None)):
         require_library()
         filename = file.filename or "form.zip"
         try:
@@ -173,15 +175,21 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             except (AsaExportError, UnicodeDecodeError) as exc:
                 raise HTTPException(400, f"ASA export: {exc}")
             unmatched = apply_asa_export(form, mapping)
+        template_data = await template.read()
+        try:
+            template_check = check_template(template_data, form)
+        except TemplateError as exc:
+            raise HTTPException(400, f"ASA template: {exc}")
         review = build_review(form, state.matcher, state.library)
-        sid = state.store.create_session(form.name, review)
+        review["existing_source"] = "asa_export" if asa_file is not None else "pdf"
+        sid = state.store.create_session(form.name, review, template=template_data)
         fields = review["fields"]
         return {"id": sid, "form_name": form.name, "fields": len(fields),
                 "skipped": sum(1 for f in fields if f["skip_reason"]),
                 # counted like the form builder's ASA column: fields plus options
                 "existing_asa": sum(bool(f["existing_asa"]) + sum(bool(o["existing_asa"]) for o in f["options"])
                                     for f in fields),
-                "asa_unmatched": unmatched}
+                "asa_unmatched": unmatched, "template": template_check}
 
     @app.get("/api/sessions/{sid}")
     def get_session(sid: str):
@@ -222,6 +230,19 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         filename = re.sub(r"[^A-Za-z0-9._ ()-]+", "_", session["form_name"]) + " - ASA review.xlsx"
         return Response(data, media_type=XLSX_MIME,
                         headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+    @app.get("/api/sessions/{sid}/template.xlsx")
+    def download_template(sid: str):
+        session = require_session(sid)
+        template_data = state.store.get_template(sid)
+        if template_data is None:
+            raise HTTPException(404, "This review was started without an ASA template.")
+        assignments = final_asas(session["review"], session["decisions"])
+        filled, no_row = fill_template(template_data, assignments)
+        filename = re.sub(r"[^A-Za-z0-9._ ()-]+", "_", session["form_name"]) + "_asa_mapping_template.xlsx"
+        return Response(filled, media_type=XLSX_MIME, headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-ASA-Rows-Filled": str(len(assignments) - len(no_row))})
 
     @app.get("/api/sessions/{sid}/asa.txt")
     def download_asa_txt(sid: str):

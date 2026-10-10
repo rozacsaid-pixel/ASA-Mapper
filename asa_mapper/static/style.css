@@ -67,3 +67,7 @@ menu { display: flex; justify-content: flex-end; padding: 0; }
 .copy { padding: 0 6px; font-size: 12px; border-radius: 4px; background: transparent; color: var(--accent); border-color: transparent; }
 .copy:hover { border-color: var(--border); background: var(--panel); }
 .meta .copy { margin-left: -6px; }
+.steps { padding-left: 20px; }
+.steps li { margin: 10px 0; }
+.req { color: var(--warn); font-size: 12px; }
+.drop { cursor: default; }

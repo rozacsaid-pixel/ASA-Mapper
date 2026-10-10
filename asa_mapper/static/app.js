@@ -53,31 +53,53 @@ async function showHome() {
   ).join("") || `<tr><td colspan="3" class="muted">No reviews yet.</td></tr>`;
 }
 
-async function uploadExport(file) {
+const SLOTS = { zip: "#export-file", xlsx: "#template-file", txt: "#asa-file" };
+const chosen = { zip: null, xlsx: null, txt: null };
+
+function setFile(kind, file) {
+  chosen[kind] = file;
+  $(`${SLOTS[kind]}-name`).textContent = file ? file.name : "";
+  $("#start-review").disabled = !(chosen.zip && chosen.xlsx);
+}
+
+for (const [kind, sel] of Object.entries(SLOTS)) {
+  $(sel).onchange = (ev) => { setFile(kind, ev.target.files[0] || null); ev.target.value = ""; };
+}
+
+function warnTemplate(check) {
+  const parts = [];
+  if (check.missing_in_template.length) parts.push(`${check.missing_in_template.length} form fields/options have no template row (e.g. ${check.missing_in_template.slice(0, 5).join(", ")})`);
+  if (check.not_in_form.length) parts.push(`${check.not_in_form.length} template rows are not in this form (e.g. ${check.not_in_form.slice(0, 5).join(", ")})`);
+  if (parts.length) alert(`The template may be for a different form version:\n- ${parts.join("\n- ")}`);
+}
+
+$("#start-review").onclick = async () => {
   const msg = $("#upload-msg");
   msg.textContent = "Reading the export and preparing suggestions…";
   const fd = new FormData();
-  fd.append("file", file);
-  const asaFile = $("#asa-file").files[0];
-  if (asaFile) fd.append("asa_file", asaFile);
+  fd.append("file", chosen.zip);
+  fd.append("template", chosen.xlsx);
+  if (chosen.txt) fd.append("asa_file", chosen.txt);
   try {
     const r = await api("/api/sessions", { method: "POST", body: fd });
     msg.textContent = "";
+    warnTemplate(r.template);
     if (r.asa_unmatched.length) alert(`ASA export lines not found in this form: ${r.asa_unmatched.join(", ")}`);
-    $("#asa-file").value = "";
-    $("#asa-file-name").textContent = "";
+    for (const kind of Object.keys(SLOTS)) setFile(kind, null);
     location.hash = `#/review/${r.id}`;
   } catch (e) { msg.textContent = e.message; }
-}
-$("#asa-file").onchange = (ev) => { $("#asa-file-name").textContent = ev.target.files[0] ? ev.target.files[0].name : ""; };
-$("#export-file").onchange = (ev) => { if (ev.target.files[0]) uploadExport(ev.target.files[0]); ev.target.value = ""; };
+};
+
 const drop = $("#drop");
 drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
 drop.ondragleave = () => drop.classList.remove("over");
 drop.ondrop = (e) => {
   e.preventDefault();
   drop.classList.remove("over");
-  if (e.dataTransfer.files[0]) uploadExport(e.dataTransfer.files[0]);
+  for (const file of e.dataTransfer.files) {
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (ext in SLOTS) setFile(ext, file);
+  }
 };
 
 /* ---------- review: helpers ---------- */
@@ -384,6 +406,7 @@ async function showReview(id) {
   state.session = s;
   state.decisions = s.decisions || {};
   $("#form-name").textContent = s.form_name;
+  $("#download-template").href = `/api/sessions/${id}/template.xlsx`;
   $("#download").href = `/api/sessions/${id}/sheet.xlsx`;
   $("#download-asa").href = `/api/sessions/${id}/asa.txt`;
   const sections = [...new Set(s.review.fields.filter((f) => !f.skip_reason).map(sectionOf))];

@@ -33,6 +33,9 @@ class Store:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(SCHEMA)
+            columns = {r["name"] for r in conn.execute("PRAGMA table_info(sessions)")}
+            if "template" not in columns:  # databases created before templates were required
+                conn.execute("ALTER TABLE sessions ADD COLUMN template BLOB")
 
     @contextmanager
     def _connect(self):
@@ -56,13 +59,20 @@ class Store:
             row = conn.execute("SELECT xlsx, source, synced_at FROM library WHERE id = 1").fetchone()
         return (bytes(row["xlsx"]), row["source"], row["synced_at"]) if row else None
 
-    def create_session(self, form_name: str, review: dict, decisions: Optional[dict] = None) -> str:
+    def create_session(self, form_name: str, review: dict, decisions: Optional[dict] = None,
+                       template: Optional[bytes] = None) -> str:
         sid = uuid.uuid4().hex[:12]
         with self._connect() as conn:
             conn.execute(
-                "INSERT INTO sessions (id, form_name, created_at, review_json, decisions_json) VALUES (?, ?, ?, ?, ?)",
-                (sid, form_name, now(), json.dumps(review), json.dumps(decisions or {})))
+                "INSERT INTO sessions (id, form_name, created_at, review_json, decisions_json, template) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (sid, form_name, now(), json.dumps(review), json.dumps(decisions or {}), template))
         return sid
+
+    def get_template(self, sid: str) -> Optional[bytes]:
+        with self._connect() as conn:
+            row = conn.execute("SELECT template FROM sessions WHERE id = ?", (sid,)).fetchone()
+        return bytes(row["template"]) if row and row["template"] is not None else None
 
     def get_session(self, sid: str) -> Optional[dict]:
         with self._connect() as conn:

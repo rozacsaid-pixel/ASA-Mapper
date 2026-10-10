@@ -22,3 +22,9 @@ def library_xlsx():
 def library(library_xlsx):
     from asa_mapper.asa_library import load_library_xlsx
     return load_library_xlsx(library_xlsx)
+
+
+@pytest.fixture
+def template_xlsx():
+    from tests.helpers import make_template_xlsx
+    return make_template_xlsx()
