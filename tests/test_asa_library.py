@@ -49,3 +49,7 @@ def test_service_account_from_json_or_path(tmp_path):
     path = tmp_path / "sa.json"
     path.write_text(json.dumps(info))
     assert service_account_info(str(path)) == info
+
+
+def test_alias_words_are_part_of_matching_text(library):
+    assert "yes bhc specialentities" in library.get("asa_yes_bhc_specialentities").text

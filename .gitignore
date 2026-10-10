@@ -2,3 +2,4 @@ fixtures/private/
 *.zip
 .env
 data/
+.venv/

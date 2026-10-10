@@ -54,7 +54,9 @@ class AsaEntry:
 
     @property
     def text(self) -> str:
-        return " ".join([self.section, self.group, self.summary, self.definition, self.keywords])
+        # The alias itself carries meaning (e.g. asa_yes_bhc_specialentities) when the summary is blank.
+        alias_words = self.asa.replace("asa_", "", 1).replace("_", " ")
+        return " ".join([self.section, self.group, self.summary, self.definition, self.keywords, alias_words])
 
 
 @dataclass
