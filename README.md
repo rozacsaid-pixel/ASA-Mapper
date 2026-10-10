@@ -38,11 +38,21 @@ Client exports and the library copy live in `fixtures/private/` and `data/`, bot
 
 ## Current accuracy
 
-Measured on 8VC Fund VI, L.P. v36 (151 known mappings), each form scored without its own mappings:
+Measured against the form builder's own ASA export for 8VC Fund VI, L.P. v36 (185 mappings in the ASA List), with no past mappings: a brand-new form. Options are scored end to end, i.e. using the app's own field suggestion as the parent hint.
 
 | | Tested | First suggestion correct | In top 3 |
 |---|---|---|---|
-| Field names | 58 | 66% | 78% |
-| Field options | 93 | 80% | 97% |
+| Field names | 84 | 66% | 80% |
+| Field options | 101 | 82% | 94% |
 
-Most remaining field misses need context the text alone doesn't give: wire instructions *from* vs *to*, individual vs joint investor name, and generic labels like "Phone Number". Past mappings from finished reviews fix repeated wording; a Claude ranking step is the planned next improvement.
+With v36 stored as past mappings, a similar form (8VC Fund VI v7) gets 57 of 62 field ASAs and 94 of 97 option ASAs right as first suggestion.
+
+Most remaining misses are address and contact fields whose meaning is only in the section (residence vs place of business vs primary contact), plus a few likely errors in the v36 data itself (Yes/No reversed, citizenship mapped to country of birth).
+
+## System ASA export
+
+The form builder's ASA export is plain text, one mapping per line: `field_key-->asa` or `field_key#option_key-->asa`.
+
+- Upload it with a form export to use it as the existing ASAs (instead of PDF links).
+- `python -m asa_mapper.cli seed <export> --asa <file.txt>` stores it as past mappings and test data.
+- **Download ASA list (.txt)** on a review writes the accepted ASAs in the same format.

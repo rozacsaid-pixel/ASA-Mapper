@@ -14,8 +14,6 @@ OPTION_WIDGETS = {"Radio", "MultipleCheckbox"}
 def option_suggestions(field: FormField, parent_asa: str, matcher: Matcher) -> Dict[str, List[dict]]:
     if field.widget not in OPTION_WIDGETS:
         return {}
-    if not parent_asa:
-        return {o.key: [] for o in field.options}
     return {key: [asdict(s) for s in ranked] for key, ranked in matcher.suggest_options(field, parent_asa).items()}
 
 

@@ -5,6 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from .asa_export import apply_asa_export, parse_asa_export
 from .asa_library import load_library_xlsx
 from .evaluate import evaluate
 from .export_parser import form_label, parse_export
@@ -20,6 +21,7 @@ def main(argv=None) -> int:
     lib.add_argument("xlsx", type=Path)
     seed = sub.add_parser("seed", help="Store existing ASA mappings from mapped form exports")
     seed.add_argument("exports", nargs="+", type=Path)
+    seed.add_argument("--asa", type=Path, help="system ASA export (.txt) for a single form export")
     sub.add_parser("evaluate", help="Print accuracy on stored mappings")
     args = parser.parse_args(argv)
 
@@ -40,9 +42,16 @@ def main(argv=None) -> int:
     library = load_library_xlsx(saved[0], settings.sheet_tab)
 
     if args.cmd == "seed":
+        if args.asa and len(args.exports) != 1:
+            print("--asa needs exactly one form export", file=sys.stderr)
+            return 2
         for path in args.exports:
             form = parse_export(path)
             form.name = form_label(form.name, path.name)
+            if args.asa:
+                unmatched = apply_asa_export(form, parse_asa_export(args.asa.read_text(encoding="utf-8-sig")))
+                if unmatched:
+                    print(f"Not in the form: {', '.join(unmatched)}", file=sys.stderr)
             mappings = mappings_from_form(form, library)
             store.replace_past(form.name, mappings)
             print(f"Seeded {len(mappings)} mappings from {form.name}")

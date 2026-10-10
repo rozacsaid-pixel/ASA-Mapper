@@ -100,3 +100,4 @@ class PastMapping:
     parent_asa: str = ""
     field_label: str = ""
     option_labels: List[str] = field(default_factory=list)
+    key: str = ""

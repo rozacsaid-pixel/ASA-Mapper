@@ -22,6 +22,9 @@
     <h2>Start a review</h2>
     <label class="drop" id="drop">Drop a form export .zip here, or click to choose
       <input id="export-file" type="file" accept=".zip" hidden></label>
+    <p class="muted">Optional: add the form builder's ASA export (<span class="mono">key--&gt;asa</span> lines) first, so existing ASAs come from the system instead of PDF links.
+      <label class="button">Choose ASA export .txt<input id="asa-file" type="file" accept=".txt,text/plain" hidden></label>
+      <span id="asa-file-name" class="mono"></span></p>
     <p id="upload-msg" class="msg"></p>
     <h2>Reviews</h2>
     <table class="list">
@@ -48,6 +51,7 @@
       <input id="filter-text" type="search" placeholder="Search label or key">
       <span class="spacer"></span>
       <a id="download" class="button" href="#">Download review sheet</a>
+      <a id="download-asa" class="button" href="#" title="Accepted ASAs as key-->asa lines">Download ASA list (.txt)</a>
       <button id="finish" type="button" class="primary">Finish review</button>
     </div>
     <p id="review-msg" class="msg"></p>

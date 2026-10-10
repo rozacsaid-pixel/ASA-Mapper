@@ -9,27 +9,21 @@ ACCEPTED = {"accepted", "changed"}
 
 
 def existing_name_asa(field: FormField, library: Library) -> str:
-    """The field's current Field name ASA: a direct link, else the parent of a linked option ASA."""
-    for asa in field.existing_asa:
-        entry = library.get(asa)
-        if entry and entry.kind == "name":
-            return asa
-    for option in field.options:
-        for asa in option.existing_asa:
-            entry = library.get(asa)
-            if entry and entry.kind == "option" and entry.parent:
-                return entry.parent
-    return ""
+    """The field's own Field name ASA. Option ASAs say nothing about it: a checkbox option's ASA
+    often sits under a different field name (one asa_yes_<category> per checkbox)."""
+    return next((a for a in field.existing_asa if library.get(a) and library.get(a).kind == "name"), "")
 
 
 def _field_mapping(form: str, field: FormField, asa: str) -> PastMapping:
     return PastMapping(form=form, kind="field", label=field.label, path=field.path, headings=field.headings,
-                       widget=field.widget, asa=asa, option_labels=[o.label for o in field.options])
+                       widget=field.widget, asa=asa, option_labels=[o.label for o in field.options],
+                       key=field.key)
 
 
 def _option_mapping(form: str, field: FormField, label: str, asa: str, parent: str) -> PastMapping:
     return PastMapping(form=form, kind="option", label=label, path=field.path, headings=field.headings,
-                       widget=field.widget, asa=asa, parent_asa=parent, field_label=field.label)
+                       widget=field.widget, asa=asa, parent_asa=parent, field_label=field.label,
+                       option_labels=[o.label for o in field.options], key=field.key)
 
 
 def mappings_from_form(form: ParsedForm, library: Library) -> List[PastMapping]:

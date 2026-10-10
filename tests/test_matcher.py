@@ -47,14 +47,41 @@ def test_no_overlap_gives_no_suggestions(library):
     assert Matcher(library).suggest_field(field("zzz qqq")) == []
 
 
-def test_option_suggestions_limited_to_parent(library):
+def test_option_suggestions_rank_parent_options_first(library):
     f = field("Is the undersigned a bank holding company?", widget="Radio", options=["Yes", "No"])
     out = Matcher(library).suggest_options(f, "asa_bhc_specialentities")
     assert out["Yes"][0].asa == "asa_yes_bhc_specialentities"
     assert out["No"][0].asa == "asa_no_bhc_specialentities"
-    assert {s.asa for ss in out.values() for s in ss} <= {
-        "asa_yes_bhc_specialentities", "asa_no_bhc_specialentities"}
+    assert "under field ASA" in out["Yes"][0].reason
 
 
-def test_option_suggestions_unknown_parent(library):
-    assert Matcher(library).suggest_options(field("x", widget="Radio", options=["A"]), "asa_nope") == {"A": []}
+def test_option_suggestions_come_from_whole_library(library):
+    f = field("Investor type", widget="MultipleCheckbox", options=["Entity"])
+    assert Matcher(library).suggest_options(f, "")["Entity"][0].asa == "asa_entity_investortype"
+
+
+def test_option_past_mapping_needs_same_field_wording(library):
+    f = field("Is the undersigned a bank holding company?", widget="Radio", options=["Unsure"])
+    past = [PastMapping(form="Old", kind="option", label="Unsure", path=[], headings=[], widget="Radio",
+                        asa="asa_no_bhc_specialentities", parent_asa="asa_bhc_specialentities",
+                        field_label="Is the undersigned a bank holding company?")]
+    top = Matcher(library, past).suggest_options(f, "asa_bhc_specialentities")["Unsure"][0]
+    assert top.asa == "asa_no_bhc_specialentities" and "seen before in 'Old'" in top.reason
+    other = field("Something else entirely?", widget="Radio", options=["Unsure"])
+    assert "seen before" not in Matcher(library, past).suggest_options(other, "asa_bhc_specialentities")["Unsure"][0].reason
+
+
+def test_yes_no_polarity(library):
+    radio = field("Is the undersigned a bank holding company?", widget="Radio", options=["Yes", "No"])
+    out = Matcher(library).suggest_options(radio, "asa_bhc_specialentities", top_n=10)
+    assert "asa_no_bhc_specialentities" not in [s.asa for s in out["Yes"]]
+    assert "asa_yes_bhc_specialentities" not in [s.asa for s in out["No"]]
+    box = field("Bank holding company", widget="MultipleCheckbox", options=["Bank holding company"])
+    assert all(not s.asa.startswith("asa_no_")
+               for s in Matcher(library).suggest_options(box, "", top_n=10)["Bank holding company"])
+
+
+def test_field_key_words_help_generic_labels(library):
+    assert Matcher(library).suggest_field(
+        FormField(key="phone_contact1", widget="Phone", label="Customformat"))[0].asa == "asa_phone_primarycontact_contactinfo"
+

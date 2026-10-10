@@ -19,14 +19,18 @@ def evaluate(library: Library, past: List[PastMapping], top_n: int = 3) -> dict:
             if pm.form != form or pm.asa not in library:
                 continue
             if pm.kind == "field":
-                query = FormField(key="", widget=pm.widget, label=pm.label, path=pm.path, headings=pm.headings,
+                query = FormField(key=pm.key, widget=pm.widget, label=pm.label, path=pm.path, headings=pm.headings,
                                   options=[FormOption(key=str(i), label=l) for i, l in enumerate(pm.option_labels)])
                 ranked = [s.asa for s in matcher.suggest_field(query, top_n=top_n)]
                 bucket = stats["fields"]
             else:
-                query = FormField(key="", widget=pm.widget, label=pm.field_label, path=pm.path,
-                                  headings=pm.headings, options=[FormOption(key="o", label=pm.label)])
-                ranked = [s.asa for s in matcher.suggest_options(query, pm.parent_asa, top_n=top_n)["o"]]
+                siblings = [FormOption(key=f"s{i}", label=l) for i, l in enumerate(pm.option_labels) if l != pm.label]
+                query = FormField(key=pm.key, widget=pm.widget, label=pm.field_label, path=pm.path,
+                                  headings=pm.headings, options=[FormOption(key="o", label=pm.label)] + siblings)
+                # Use the matcher's own field suggestion as the parent hint, as a real review would.
+                field_top = matcher.suggest_field(query, top_n=1)
+                parent = field_top[0].asa if field_top else ""
+                ranked = [s.asa for s in matcher.suggest_options(query, parent, top_n=top_n)["o"]]
                 bucket = stats["options"]
             hit = bool(ranked) and ranked[0] == pm.asa
             bucket["total"] += 1

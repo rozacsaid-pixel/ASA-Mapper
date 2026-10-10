@@ -79,3 +79,19 @@ def test_search_matches_all_words_and_prefers_parent(client, library_xlsx):
     rows = client.get("/api/search", params={"kind": "option", "parent": "asa_bhc_specialentities"}).json()
     assert [r["asa"] for r in rows[:2]] == ["asa_yes_bhc_specialentities", "asa_no_bhc_specialentities"]
     assert "asa_individual_investortype" in [r["asa"] for r in rows]
+
+
+def test_session_with_system_asa_export_and_txt_download(client, library_xlsx, export_zip):
+    upload(client, "/api/library/upload", "lib.xlsx", library_xlsx)
+    asa_text = b"email1-->asa_email_primarycontact_contactinfo\nbank#No-->asa_no_bhc_specialentities\nghost-->asa_x\n"
+    created = client.post("/api/sessions", files={"file": ("e.zip", export_zip), "asa_file": ("asa.txt", asa_text)}).json()
+    assert created["existing_asa"] == 2 and created["asa_unmatched"] == ["ghost"]
+    fields = {f["key"]: f for f in client.get(f"/api/sessions/{created['id']}").json()["review"]["fields"]}
+    assert fields["email1"]["existing_asa"] == ["asa_email_primarycontact_contactinfo"]
+    assert fields["fullname"]["existing_asa"] == []
+    bad = client.post("/api/sessions", files={"file": ("e.zip", export_zip), "asa_file": ("asa.txt", b"oops")})
+    assert bad.status_code == 400
+    client.put(f"/api/sessions/{created['id']}/decisions",
+               json={"phone1": {"status": "changed", "asa": "asa_phone_primarycontact_contactinfo"}})
+    txt = client.get(f"/api/sessions/{created['id']}/asa.txt")
+    assert txt.status_code == 200 and txt.text == "phone1-->asa_phone_primarycontact_contactinfo\n"

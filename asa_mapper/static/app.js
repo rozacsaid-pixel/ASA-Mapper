@@ -58,12 +58,18 @@ async function uploadExport(file) {
   msg.textContent = "Reading the export and preparing suggestions…";
   const fd = new FormData();
   fd.append("file", file);
+  const asaFile = $("#asa-file").files[0];
+  if (asaFile) fd.append("asa_file", asaFile);
   try {
     const r = await api("/api/sessions", { method: "POST", body: fd });
     msg.textContent = "";
+    if (r.asa_unmatched.length) alert(`ASA export lines not found in this form: ${r.asa_unmatched.join(", ")}`);
+    $("#asa-file").value = "";
+    $("#asa-file-name").textContent = "";
     location.hash = `#/review/${r.id}`;
   } catch (e) { msg.textContent = e.message; }
 }
+$("#asa-file").onchange = (ev) => { $("#asa-file-name").textContent = ev.target.files[0] ? ev.target.files[0].name : ""; };
 $("#export-file").onchange = (ev) => { if (ev.target.files[0]) uploadExport(ev.target.files[0]); ev.target.value = ""; };
 const drop = $("#drop");
 drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
@@ -379,6 +385,7 @@ async function showReview(id) {
   state.decisions = s.decisions || {};
   $("#form-name").textContent = s.form_name;
   $("#download").href = `/api/sessions/${id}/sheet.xlsx`;
+  $("#download-asa").href = `/api/sessions/${id}/asa.txt`;
   const sections = [...new Set(s.review.fields.filter((f) => !f.skip_reason).map(sectionOf))];
   $("#filter-section").innerHTML = `<option value="">All sections</option>` +
     sections.map((x) => `<option>${esc(x)}</option>`).join("");

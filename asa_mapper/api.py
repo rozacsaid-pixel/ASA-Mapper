@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from .asa_export import AsaExportError, apply_asa_export, format_asa_export, parse_asa_export
 from .asa_library import XLSX_MIME, LibraryError, fetch_google_sheet_xlsx, load_library_xlsx
 from .auth import current_user, install_auth
 from .evaluate import evaluate
@@ -157,7 +158,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return state.store.list_sessions()
 
     @app.post("/api/sessions")
-    async def create_session(file: UploadFile = File(...)):
+    async def create_session(file: UploadFile = File(...), asa_file: Optional[UploadFile] = File(None)):
         require_library()
         filename = file.filename or "form.zip"
         try:
@@ -165,12 +166,22 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         except ExportError as exc:
             raise HTTPException(400, str(exc))
         form.name = form_label(form.name, filename)
+        unmatched = []
+        if asa_file is not None:
+            try:
+                mapping = parse_asa_export((await asa_file.read()).decode("utf-8-sig"))
+            except (AsaExportError, UnicodeDecodeError) as exc:
+                raise HTTPException(400, f"ASA export: {exc}")
+            unmatched = apply_asa_export(form, mapping)
         review = build_review(form, state.matcher, state.library)
         sid = state.store.create_session(form.name, review)
         fields = review["fields"]
         return {"id": sid, "form_name": form.name, "fields": len(fields),
                 "skipped": sum(1 for f in fields if f["skip_reason"]),
-                "existing_asa": sum(1 for f in fields if f["existing_asa"])}
+                # counted like the form builder's ASA column: fields plus options
+                "existing_asa": sum(bool(f["existing_asa"]) + sum(bool(o["existing_asa"]) for o in f["options"])
+                                    for f in fields),
+                "asa_unmatched": unmatched}
 
     @app.get("/api/sessions/{sid}")
     def get_session(sid: str):
@@ -210,6 +221,13 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         data = review_sheet(session["form_name"], session["review"], session["decisions"])
         filename = re.sub(r"[^A-Za-z0-9._ ()-]+", "_", session["form_name"]) + " - ASA review.xlsx"
         return Response(data, media_type=XLSX_MIME,
+                        headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+    @app.get("/api/sessions/{sid}/asa.txt")
+    def download_asa_txt(sid: str):
+        session = require_session(sid)
+        filename = re.sub(r"[^A-Za-z0-9._ ()-]+", "_", session["form_name"]) + " - ASA.txt"
+        return Response(format_asa_export(session["decisions"]), media_type="text/plain; charset=utf-8",
                         headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
     @app.post("/api/sessions/{sid}/finish")
