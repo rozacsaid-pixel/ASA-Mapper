@@ -194,30 +194,30 @@ function fieldRows(f) {
       <td>${asaSelect([], f.existing_asa, decided(d) ? d.asa : "")} ${copyAsaButton}</td>
       <td></td>
       <td>${statusBadge(d && d.status)}</td>
-      <td><button type="button" data-accept>Accept</button></td></tr>`;
+      <td class="actions"><button type="button" data-accept>Accept</button> <button type="button" data-none>No ASA</button></td></tr>`;
   }
   const sug = suggOf(f.key);
   const d = state.decisions[f.key];
   const current = currentAsa(d, sug.field);
-  let html = `<tr class="field" data-key="${esc(f.key)}">
+  let html = `<tr class="field${decided(d) ? "" : " pending"}" data-key="${esc(f.key)}">
     <td>${labelCell(f)}</td>
     <td>${existingCell(f.existing_asa, sug.flags)}</td>
     <td>${asaSelect(sug.field, f.existing_asa, current)} ${copyAsaButton}</td>
     <td>${confBadge(sug.field.find((r) => r.asa === current))}</td>
     <td>${statusBadge(d && d.status)}</td>
-    <td><button type="button" data-accept>Accept</button></td></tr>`;
+    <td class="actions"><button type="button" data-accept>Accept</button> <button type="button" data-none>No ASA</button></td></tr>`;
   if (!hasOptions(f)) return html;
   for (const o of f.options) {
     const od = ((d && d.options) || {})[o.key];
     const ranked = sug.options[o.key] || [];
     const cur = currentAsa(od, ranked);
-    html += `<tr class="option" data-key="${esc(f.key)}" data-opt="${esc(o.key)}">
+    html += `<tr class="option${decided(od) ? "" : " pending"}" data-key="${esc(f.key)}" data-opt="${esc(o.key)}">
       <td class="opt-label">↳ ${esc(o.label)}<div class="meta">${copyButton(`${f.key}#${o.key}`)}</div></td>
       <td>${existingCell(o.existing_asa, [])}</td>
       <td>${asaSelect(ranked, o.existing_asa, cur)} ${copyAsaButton}</td>
       <td>${confBadge(ranked.find((r) => r.asa === cur))}</td>
       <td>${statusBadge(od && od.status)}</td>
-      <td><button type="button" data-accept>Accept</button></td></tr>`;
+      <td class="actions"><button type="button" data-accept>Accept</button> <button type="button" data-none>No ASA</button></td></tr>`;
   }
   return html;
 }
@@ -267,6 +267,8 @@ function updateProgress() {
   }
   $("#progress-bar").style.width = total ? `${(100 * done) / total}%` : "0";
   $("#progress-text").textContent = `${done} of ${total} reviewed`;
+  $("#next-pending").textContent = total > done ? `Next unreviewed (${total - done})` : "All reviewed";
+  $("#next-pending").disabled = total === done;
 }
 
 /* ---------- review: changes ---------- */
@@ -379,6 +381,12 @@ $("#review-body").addEventListener("click", async (ev) => {
   }
   const high = ev.target.closest("[data-accept-high]");
   if (high) { acceptHigh(high.dataset.acceptHigh); return; }
+  const none = ev.target.closest("[data-none]");
+  if (none) {
+    const row = none.closest("tr");
+    await setDecision(row.dataset.key, row.dataset.opt, "", "none");
+    return;
+  }
   const btn = ev.target.closest("[data-accept]");
   if (!btn) return;
   const row = btn.closest("tr");
@@ -390,6 +398,28 @@ $("#review-body").addEventListener("click", async (ev) => {
 
 for (const id of ["#filter-status", "#filter-section"]) $(id).onchange = renderReview;
 $("#filter-text").oninput = renderReview;
+
+// Jump to the next row still "Not reviewed" below the middle of the screen, wrapping to the top.
+// If the filters hide every such row, switch to the "Not reviewed" filter first.
+function goToNextPending() {
+  let rows = [...document.querySelectorAll("#review-body tr.pending")];
+  if (!rows.length) {
+    $("#filter-status").value = "pending";
+    $("#filter-section").value = "";
+    $("#filter-text").value = "";
+    renderReview();
+    rows = [...document.querySelectorAll("#review-body tr.pending")];
+  }
+  if (!rows.length) return;
+  const middle = window.innerHeight / 2;
+  const next = rows.find((r) => r.getBoundingClientRect().top > middle + 1) || rows[0];
+  next.scrollIntoView({ block: "center", behavior: "smooth" });
+  next.classList.add("flash");
+  setTimeout(() => next.classList.remove("flash"), 1600);
+  const select = next.querySelector("select[data-asa]");
+  if (select) select.focus({ preventScroll: true });
+}
+$("#next-pending").onclick = goToNextPending;
 
 $("#finish").onclick = async () => {
   if (!confirm("Finish this review and save the accepted ASAs to improve future suggestions?")) return;

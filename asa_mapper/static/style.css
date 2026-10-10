@@ -71,3 +71,7 @@ menu { display: flex; justify-content: flex-end; padding: 0; }
 .steps li { margin: 10px 0; }
 .req { color: var(--warn); font-size: 12px; }
 .drop { cursor: default; }
+.actions { white-space: nowrap; }
+tr.flash td { background: var(--medium-bg) !important; transition: background 0.3s; }
+.fields td:nth-child(3) { white-space: nowrap; }
+.fields td:nth-child(3) select { width: calc(100% - 32px); }

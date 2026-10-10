@@ -18,6 +18,10 @@ HELPER_KEY = re.compile(r"^(is_|split\d+$|field_below$|radio_uncheck$|shortcut$|
 HELPER_LABELS = ("for splitting rule",)  # "For Mapping"/combined-address boxes carry real ASAs
 LOGIC_PAGES = {"logic support"}
 MAX_HEADING_LEN = 150
+# "Check this box if you have a secondary contact…", "I confirm that I have read…": UI switches, not data points.
+INSTRUCTION_OPTION = re.compile(
+    r"^\s*(check (this|the) box|check if|i (hereby )?(confirm|agree|acknowledge|consent|certify|understand|have read))\b",
+    re.I)
 HEADINGS_KEPT = 2
 
 
@@ -124,11 +128,11 @@ def _make_field(key: str, widget: str, title: str, u: dict, path: List[str], hea
     return FormField(
         key=key, widget=widget, label=label, path=list(path), headings=list(headings),
         options=options, existing_asa=existing, hidden=bool(u.get("ui:invisible")),
-        skip_reason=_skip_reason(key, widget, label, path),
+        skip_reason=skip_reason(key, widget, label, path, options),
     )
 
 
-def _skip_reason(key: str, widget: str, label: str, path: List[str]):
+def skip_reason(key: str, widget: str, label: str, path: List[str], options: List[FormOption] = ()):
     if widget in SKIP_WIDGETS:
         return f"{widget} field"
     if any(p.strip().lower() in LOGIC_PAGES for p in path):
@@ -137,4 +141,6 @@ def _skip_reason(key: str, widget: str, label: str, path: List[str]):
         return "logic helper field"
     if any(h in label.lower() for h in HELPER_LABELS):
         return "mapping helper field"
+    if widget == "MultipleCheckbox" and options and all(INSTRUCTION_OPTION.match(o.label) for o in options):
+        return "instruction/consent checkbox"
     return None

@@ -53,3 +53,24 @@ def test_clean_text_strips_html_and_footnotes():
 def test_form_label_adds_version():
     assert form_label("Fund", "Fund - Version 36.zip") == "Fund (Version 36)"
     assert form_label("Fund", "export.zip") == "Fund"
+
+
+def test_instruction_and_consent_checkboxes_are_skipped():
+    from asa_mapper.export_parser import skip_reason
+    from asa_mapper.models import FormOption
+
+    def box(*labels, widget="MultipleCheckbox"):
+        return [FormOption(key=str(i), label=l) for i, l in enumerate(labels)]
+
+    reason = "instruction/consent checkbox"
+    assert skip_reason("multiplecheckbox33", "MultipleCheckbox", "Multiplecheckbox 24", [],
+                       box("Check this box if you have a secondary contact to receive the information")) == reason
+    assert skip_reason("checkif3", "MultipleCheckbox", "Check if", [], box("Check if you wish to add contacts")) == reason
+    assert skip_reason("h_confirm", "MultipleCheckbox", "Multiplecheckbox", [],
+                       box("I confirm that I have read, understand, and agree to the above")) == reason
+    assert skip_reason("x", "MultipleCheckbox", "x", [], box("I hereby acknowledge the terms")) == reason
+    # real data points stay
+    assert skip_reason("radio", "MultipleCheckbox", "Or, the undersigned represents", [],
+                       box("The undersigned is NOT an accredited investor.")) is None
+    assert skip_reason("mix", "MultipleCheckbox", "x", [], box("Check this box if...", "A bank")) is None
+    assert skip_reason("r", "Radio", "Check this box", [], box("Check this box if ...")) is None
