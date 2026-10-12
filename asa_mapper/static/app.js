@@ -53,8 +53,8 @@ async function showHome() {
   ).join("") || `<tr><td colspan="3" class="muted">No reviews yet.</td></tr>`;
 }
 
-const SLOTS = { zip: "#export-file", xlsx: "#template-file", txt: "#asa-file" };
-const chosen = { zip: null, xlsx: null, txt: null };
+const SLOTS = { zip: "#export-file", xlsx: "#template-file" };
+const chosen = { zip: null, xlsx: null };
 
 function setFile(kind, file) {
   chosen[kind] = file;
@@ -79,12 +79,10 @@ $("#start-review").onclick = async () => {
   const fd = new FormData();
   fd.append("file", chosen.zip);
   fd.append("template", chosen.xlsx);
-  if (chosen.txt) fd.append("asa_file", chosen.txt);
   try {
     const r = await api("/api/sessions", { method: "POST", body: fd });
     msg.textContent = "";
     warnTemplate(r.template);
-    if (r.asa_unmatched.length) alert(`ASA export lines not found in this form: ${r.asa_unmatched.join(", ")}`);
     for (const kind of Object.keys(SLOTS)) setFile(kind, null);
     location.hash = `#/review/${r.id}`;
   } catch (e) { msg.textContent = e.message; }
