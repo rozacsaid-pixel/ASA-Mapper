@@ -23,7 +23,8 @@ class Settings:
     def from_env(cls) -> "Settings":
         env = os.environ.get
         return cls(
-            data_dir=Path(env("ASA_DATA_DIR", "data")),
+            # Vercel's filesystem is read-only except /tmp (which is not persistent).
+            data_dir=Path(env("ASA_DATA_DIR", "/tmp/asa-data" if env("VERCEL") else "data")),
             sheet_id=env("ASA_SHEET_ID", DEFAULT_SHEET_ID),
             sheet_tab=env("ASA_SHEET_TAB", "ASA List"),
             service_account=env("ASA_GOOGLE_SERVICE_ACCOUNT", ""),
